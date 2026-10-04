@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#11171c">
+  <title>Challenger · City Sprint</title>
+  <meta name="description" content="Take the green Challenger through a three-lap city time trial. Play with touch controls or your keyboard.">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='7' fill='%2311171c'/%3E%3Cpath d='M8 7h6v18H8zm10 0h6v18h-6z' fill='%23b4f05d'/%3E%3C/svg%3E">
+  <link rel="stylesheet" href="style.css">
+  <script defer src="three.js"></script><script defer src="challenger.js"></script><script defer src="race-core.js"></script><script defer src="game.js"></script>
+</head>
+<body>
+  <main id="game" aria-label="Challenger city racing game">
+    <canvas id="scene" aria-label="Three dimensional city race course"></canvas>
+    <header class="topbar">
+      <div class="brand"><span class="brand-mark" aria-hidden="true">Ⅱ</span><div>CHALLENGER<span>CITY SPRINT</span></div></div>
+      <div class="top-actions"><button id="sound" class="utility" aria-pressed="false" title="Toggle engine sound">SOUND OFF</button><button id="fullscreen" class="utility" title="Enter fullscreen">FULLSCREEN</button><button id="pause" class="utility" aria-label="Pause race" hidden>PAUSE</button></div>
+    </header>
+    <div id="hud" hidden>
+      <div class="timing"><div class="lap-label">LAP <strong id="lap">1<span>/ 3</span></strong></div><div class="clock-label">RACE TIME<strong id="time">00:00.00</strong></div></div>
+      <div class="map-panel"><canvas id="map" width="280" height="230" aria-label="Course map and next checkpoint"></canvas><div id="checkpoint-label">CHECKPOINT 1 / 8</div></div>
+      <div class="speed-panel"><div><strong id="speed">0</strong><span>MPH</span></div><div class="speed-track"><i id="speed-bar"></i></div><small id="gear">N</small></div>
+      <button id="reset" class="reset-button" title="Return to your last checkpoint with a three-second penalty">RESET CAR <span>+3s</span></button>
+      <div class="keyboard-hint">WASD / ARROWS <b>DRIVE</b> · SPACE <b>DRIFT</b> · R <b>RESET</b></div>
+    </div>
+    <div id="status" class="status" role="status" aria-live="polite"></div>
+    <div id="countdown" class="countdown" aria-live="assertive"></div>
+    <div id="touch-controls" hidden>
+      <div class="steer-pad"><button class="drive-button steer" data-control="left" aria-label="Steer left">◀</button><button class="drive-button steer" data-control="right" aria-label="Steer right">▶</button></div>
+      <div class="pedals"><button class="drive-button drift" data-control="drift">DRIFT</button><button class="drive-button brake" data-control="brake">BRAKE<span>REVERSE</span></button><button class="drive-button gas" data-control="gas">GAS</button></div>
+    </div>
+    <section id="start-screen" class="screen start-screen" aria-labelledby="start-title">
+      <div class="intro-card"><div class="eyebrow">CITY CIRCUIT · 3 LAPS</div><h1 id="start-title">GREEN LIGHT.<br><em>FULL THROTTLE.</em></h1><p>Your Challenger. Eight checkpoints.<br>Find your line through the city.</p>
+        <button id="start" class="primary" disabled>PREPARING THE GRID…</button>
+        <div class="intro-controls"><span><b>DESKTOP</b> WASD or arrow keys</span><span><b>MOBILE</b> Hold the pedals and steering</span></div>
+        <p class="small-note">Landscape recommended · Sound starts muted</p>
+      </div>
+      <div class="course-caption"><span>01 / CITY SPRINT</span><strong>CHALLENGER T/A</strong><span>TIME TRIAL · NO OPPONENTS</span></div>
+    </section>
+    <section id="pause-screen" class="screen centered" hidden aria-labelledby="pause-title"><div class="dialog"><div class="eyebrow">TAKE A BREATHER</div><h2 id="pause-title">Race paused</h2><p>Your timer is stopped.</p><button id="resume" class="primary">RESUME RACE</button><button id="restart-paused" class="secondary">RESTART RACE</button></div></section>
+    <section id="finish-screen" class="screen centered" hidden aria-labelledby="finish-title"><div class="dialog results"><div class="eyebrow">CHECKERED FLAG</div><h2 id="finish-title">Circuit complete.</h2><div id="final-time" class="final-time">00:00.00</div><div id="lap-results"></div><p id="result-note"></p><button id="again" class="primary">RACE AGAIN</button></div></section>
+    <section id="error-screen" class="screen centered" hidden aria-labelledby="error-title"><div class="dialog"><h2 id="error-title">The grid couldn’t load.</h2><p id="error-message">Try a current browser with WebGL enabled.</p><button class="primary" onclick="location.reload()">TRY AGAIN</button></div></section>
+    <noscript><div class="screen centered"><div class="dialog">Enable JavaScript to play this racing game.</div></div></noscript>
+  </main>
+</body>
+</html>
