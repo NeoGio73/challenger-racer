@@ -183,6 +183,7 @@ export function enter(ctx) {
     camPos: new THREE.Vector3(), camLook: new THREE.Vector3(), fov: 62, savedExposure: renderer.toneMappingExposure,
   };
   renderer.toneMappingExposure = 0.62;
+  S.savedPR = renderer.getPixelRatio(); renderer.setPixelRatio(Math.min(devicePixelRatio, 1.5));
   camera.near = 0.05; camera.far = 12000; camera.fov = 62; camera.updateProjectionMatrix();
   $('camName').textContent = 'Chase cam';
   $('hud').hidden = false;
@@ -201,7 +202,7 @@ export function exit() {
   for (const id of ['FL', 'FR', 'RL', 'RR']) { const w = parts['wheel_' + id]; w.position.copy(S.base[id]); w.rotation.set(0, 0, 0); const c = parts['caliper_' + id]; if (c) { c.position.y = S.base[id].y; c.rotation.set(0, 0, 0); } }
   parts.steering_wheel.quaternion.copy(S.steerBaseQ);
   for (const m of S.tail) m.emissiveIntensity = 1.6;
-  renderer.toneMappingExposure = S.savedExposure;
+  renderer.toneMappingExposure = S.savedExposure; renderer.setPixelRatio(S.savedPR);
   camera.near = 0.02; camera.far = 200; camera.updateProjectionMatrix();
   for (const m of built.group.userData.startLights) m.emissiveIntensity = 0;
   $('hud').hidden = true; document.body.classList.remove('driving');
@@ -259,13 +260,18 @@ function updateCamera(dt) {
   const k = S.camSnap ? 1 : 1 - Math.exp(-dt * 7);
   let fov = 62;
   if (S.cam === 'chase') {
-    const flat = _w.set(fwd.x, 0, fwd.z).normalize();
-    const want = new THREE.Vector3().copy(car.pos).addScaledVector(flat, -6.4).add(new THREE.Vector3(0, 1.85, 0));
-    const gy = TR.ground(want.x, want.z, car.hint); if (want.y < gy + 1.2) want.y = gy + 1.2;
-    S.camPos.lerp(want, k);
-    const look = new THREE.Vector3().copy(car.pos).addScaledVector(flat, 3).add(new THREE.Vector3(0, 0.55, 0));
-    S.camLook.lerp(look, S.camSnap ? 1 : 1 - Math.exp(-dt * 14));
-    camera.position.copy(S.camPos); camera.lookAt(S.camLook);
+    // Fixed distance behind the car; only the camera's heading and height are smoothed,
+    // so it never falls back at speed or lurches when the car pitches over crests.
+    const yaw = Math.atan2(fwd.x, fwd.z);
+    if (S.camSnap || S.camYaw === undefined) { S.camYaw = yaw; S.camY = car.pos.y; }
+    let dy = Math.atan2(Math.sin(yaw - S.camYaw), Math.cos(yaw - S.camYaw));
+    S.camYaw += dy * (1 - Math.exp(-dt * 5));
+    S.camY += (car.pos.y - S.camY) * (1 - Math.exp(-dt * 6));
+    const bx = Math.sin(S.camYaw), bz = Math.cos(S.camYaw);
+    const cx = car.pos.x - bx * 6.2, cz = car.pos.z - bz * 6.2;
+    let cy = S.camY + 1.85; const gy = TR.ground(cx, cz, car.hint); if (cy < gy + 1.2) cy = gy + 1.2;
+    camera.position.set(cx, cy, cz);
+    camera.lookAt(car.pos.x + bx * 3, S.camY + 0.6, car.pos.z + bz * 3);
     fov = 60 + Math.min(14, car.speed * 0.12);
   } else if (S.cam === 'cockpit' || S.cam === 'bumper') {
     const eye = S.cam === 'cockpit' ? new THREE.Vector3(0.37 + car.gLat * -0.012, 1.0 - car.gLong * 0.006, -0.22 - car.gLong * 0.015) : new THREE.Vector3(0, 0.62, 2.38);
@@ -338,7 +344,8 @@ function updateHud(dt) {
   const mm = built.minimap, g = mm.g;
   g.clearRect(0, 0, mm.size, mm.size); g.drawImage(mm.bg, 0, 0);
   const [x, y] = mm.map(c.pos.x, c.pos.z);
-  g.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--accent') || '#8cdb14';
+  if (!S.accent) S.accent = (getComputedStyle(document.documentElement).getPropertyValue('--accent') || '#8cdb14').trim();
+  g.fillStyle = S.accent;
   g.strokeStyle = '#111'; g.lineWidth = 2; g.beginPath(); g.arc(x, y, 5, 0, Math.PI * 2); g.fill(); g.stroke();
 }
 

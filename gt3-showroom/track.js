@@ -212,7 +212,7 @@ export function buildTrack(renderer) {
       tint.setHSL(0.27 + R() * 0.06, 0.35 + R() * 0.2, 0.6 + R() * 0.4); trees.setColorAt(placed, tint);
       placed++;
     }
-    trees.count = placed; trees.castShadow = true; trees.receiveShadow = true;
+    trees.count = placed; trees.castShadow = false; trees.receiveShadow = true;
     group.add(trees);
   }
 

@@ -493,8 +493,10 @@ const Y = new THREE.Vector3(0, 1, 0);
 // ---------- loop ----------
 const clock = new THREE.Clock();
 function frame() {
-  const dt = Math.min(clock.getDelta(), 0.05);
-  if (drive.isActive()) { drive.frame(dt); requestAnimationFrame(frame); return; }
+  const rawDt = clock.getDelta();
+  // drive mode keeps real time down to 10 fps; the showroom is capped for smooth tweens
+  if (drive.isActive()) { drive.frame(Math.min(rawDt, 0.1)); requestAnimationFrame(frame); return; }
+  const dt = Math.min(rawDt, 0.05);
   if (tween) {
     tween.t = Math.min(1, tween.t + dt / 1.3);
     const k = tween.t < 0.5 ? 4 * tween.t ** 3 : 1 - (-2 * tween.t + 2) ** 3 / 2;

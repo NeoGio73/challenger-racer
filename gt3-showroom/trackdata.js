@@ -47,6 +47,16 @@ export const S = { x: new Float32Array(N), y: new Float32Array(N), z: new Float3
   }
 }
 
+// vertex tangents (central difference) and segment lengths, used for smooth projection
+const VTX = new Float32Array(N), VTZ = new Float32Array(N), SEGL = new Float32Array(N), SEG2 = new Float32Array(N);
+for (let i = 0; i < N; i++) {
+  const a = (i - 1 + N) % N, b = (i + 1) % N;
+  let vx = S.x[b] - S.x[a], vz = S.z[b] - S.z[a]; const l = Math.hypot(vx, vz) || 1;
+  VTX[i] = vx / l; VTZ[i] = vz / l;
+  const sx = S.x[b] - S.x[i], sz = S.z[b] - S.z[i];
+  SEG2[i] = sx * sx + sz * sz; SEGL[i] = Math.sqrt(SEG2[i]);
+}
+
 // spatial hash of samples for nearest-centreline lookups
 const CELL = 25;
 const grid = new Map();
@@ -81,16 +91,24 @@ export function nearest(x, z, out = _res, hint = -1) {
   }
   // project onto the segment best..best+1 (or best-1..best)
   let i0 = best, i1 = (best + 1) % N;
-  let t = ((x - S.x[i0]) * (S.x[i1] - S.x[i0]) + (z - S.z[i0]) * (S.z[i1] - S.z[i0])) / ((LENGTH / N) ** 2);
-  if (t < 0) { i0 = (best - 1 + N) % N; i1 = best; t = ((x - S.x[i0]) * (S.x[i1] - S.x[i0]) + (z - S.z[i0]) * (S.z[i1] - S.z[i0])) / ((LENGTH / N) ** 2); }
-  t = Math.min(1, Math.max(0, t));
-  const px = S.x[i0] + (S.x[i1] - S.x[i0]) * t, pz = S.z[i0] + (S.z[i1] - S.z[i0]) * t;
-  const tx = S.tx[i0], tz = S.tz[i0];
-  // left normal of travel direction (tx,tz) in a y-up right-handed world is (tz, -tx)
-  const d = (x - px) * tz - (z - pz) * tx;
-  out.i = i0; out.t = t; out.d = d; out.dist = Math.abs(d);
-  out.y = S.y[i0] + (S.y[i1] - S.y[i0]) * t;
-  out.s = (i0 + t) / N;
+  let t = ((x - S.x[i0]) * (S.x[i1] - S.x[i0]) + (z - S.z[i0]) * (S.z[i1] - S.z[i0])) / SEG2[i0];
+  if (t < 0) { i0 = (best - 1 + N) % N; i1 = best; t = ((x - S.x[i0]) * (S.x[i1] - S.x[i0]) + (z - S.z[i0]) * (S.z[i1] - S.z[i0])) / SEG2[i0]; }
+  const w = Math.min(1, Math.max(0, t));
+  // Blend projections onto the vertex tangents at both ends of the segment. This keeps the
+  // along-track position, lateral offset and height continuous across segment boundaries
+  // (a plain per-segment projection steps by a few mm at every vertex, which the
+  // suspension feels as a constant buzz at speed).
+  const dx0 = x - S.x[i0], dz0 = z - S.z[i0], dx1 = x - S.x[i1], dz1 = z - S.z[i1];
+  const s0 = (dx0 * VTX[i0] + dz0 * VTZ[i0]) / SEGL[i0];
+  const s1 = 1 + (dx1 * VTX[i1] + dz1 * VTZ[i1]) / SEGL[i0];
+  const frac = s0 * (1 - w) + s1 * w;
+  const d0 = dx0 * VTZ[i0] - dz0 * VTX[i0], d1 = dx1 * VTZ[i1] - dz1 * VTX[i1];
+  const d = d0 * (1 - w) + d1 * w;
+  out.i = i0; out.t = w; out.d = d; out.dist = Math.abs(d);
+  // Catmull-Rom height: smooth slope as well as smooth height
+  const ym = S.y[(i0 - 1 + N) % N], ya = S.y[i0], yb = S.y[i1], yp = S.y[(i1 + 1) % N], u = frac;
+  out.y = ya + 0.5 * u * ((yb - ym) + u * (2 * ym - 5 * ya + 4 * yb - yp + u * (3 * (ya - yb) + yp - ym)));
+  out.s = (((i0 + frac) % N) + N) % N / N;
   return out;
 }
 

@@ -155,7 +155,7 @@ export class Car {
       wh.surface = W.surface(top.x, top.z, this.hint);
       if (!wh.contact) { wh.Fz = 0; wh.sigma *= 0.9; wh.tanA *= 0.9; comp[k] = 0; continue; }
       comp[k] = wh.restL - wh.L;
-      const Lvel = Math.max(-2.5, Math.min(2.5, (wh.L - wh.Lprev) / dt));
+      const Lvel = Math.max(-1.5, Math.min(1.5, (wh.L - wh.Lprev) / dt));
       let Fs = s.k * (wh.restL - wh.L) - (Lvel < 0 ? s.cb : s.cr) * Lvel;
       if (L < 0.07) Fs += (0.07 - L) * 600000;    // bump stop
       wh.FzSpring = Math.max(0, Fs);
@@ -165,6 +165,8 @@ export class Car {
     if (this.wheels[0].contact && this.wheels[1].contact) { this.wheels[0].FzSpring += arbF; this.wheels[1].FzSpring -= arbF; }
     if (this.wheels[2].contact && this.wheels[3].contact) { this.wheels[2].FzSpring += arbR; this.wheels[3].FzSpring -= arbR; }
 
+    // auto-hold: a stopped car with no pedals pressed stays put (like PDK's hold function)
+    const hold = inp.throttle < 0.02 && Math.abs(fwdSpeed) < 0.5 && speed < 0.6;
     let lsdT = (this.wheels[2].omega - this.wheels[3].omega) * 260;
     lsdT = Math.max(-900, Math.min(900, lsdT));
 
@@ -174,7 +176,7 @@ export class Car {
       // drive / brake torques on this wheel
       let Td = 0;
       if (!s.front) Td = driveT * 0.5 + (k === 2 ? -lsdT : lsdT);
-      let Tb = brake * s.brake + (inp.handbrake && !s.front ? 3000 : 0);
+      let Tb = brake * s.brake + (inp.handbrake && !s.front ? 3000 : 0) + (hold ? 1500 : 0);
       if (!wh.contact) {
         wh.omega += (Td / (s.front ? 1.2 : 1.6)) * dt;
         const dec = Tb / 1.4 * dt; wh.omega = Math.abs(wh.omega) <= dec ? 0 : wh.omega - Math.sign(wh.omega) * dec;
