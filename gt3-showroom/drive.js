@@ -86,6 +86,8 @@ addEventListener('blur', () => keys.clear());
 
 const touch = { l: false, r: false, gas: false, brake: false };
 function bindTouch() {
+  $('camName').addEventListener('click', () => cycleCamera());
+  $('resetBtn').addEventListener('click', () => { if (S) resetToTrack(); });
   document.querySelectorAll('[data-touch]').forEach(b => {
     const k = b.dataset.touch;
     const on = (e) => { e.preventDefault(); touch[k] = true; b.classList.add('on'); };
@@ -117,7 +119,7 @@ function readGamepad() {
 // ---------------- cameras ----------------
 const CAMS = ['chase', 'cockpit', 'bumper', 'tv'];
 const CAM_NAMES = { chase: 'Chase', cockpit: 'Cockpit', bumper: 'Bumper', tv: 'TV' };
-function cycleCamera() { S.cam = CAMS[(CAMS.indexOf(S.cam) + 1) % CAMS.length]; $('camName').textContent = CAM_NAMES[S.cam] + ' cam'; S.camSnap = true; }
+function cycleCamera() { if (!S) return; S.cam = CAMS[(CAMS.indexOf(S.cam) + 1) % CAMS.length]; $('camName').textContent = CAM_NAMES[S.cam] + ' cam'; S.camSnap = true; }
 
 function flash(msg, ms = 1800) { const el = $('driveMsg'); el.textContent = msg; el.classList.add('show'); clearTimeout(S.msgT); S.msgT = setTimeout(() => el.classList.remove('show'), ms); }
 
@@ -370,6 +372,11 @@ export function frame(dt) {
   let n = 0;
   while (S.acc >= STEP && n < 120) { S.car.step(STEP, phys); S.acc -= STEP; n++; }
   if (!isFinite(S.car.pos.x) || S.car.pos.y < -200) resetToTrack();
+  // auto-recover when the car is on its side/roof or beached against the barrier
+  const upY = _v.set(0, 1, 0).applyQuaternion(S.car.q).y;
+  const stuck = upY < 0.35 || (S.car.speed < 1.2 && Math.abs(S.car.trackD) > TR.WALL - 2.5 && S.released);
+  S.stuckT = stuck ? (S.stuckT || 0) + dt : 0;
+  if (S.stuckT > 2.5) { S.stuckT = 0; resetToTrack(); }
   syncCar();
   S.carRoot.updateMatrixWorld(true);
   updateCamera(dt);

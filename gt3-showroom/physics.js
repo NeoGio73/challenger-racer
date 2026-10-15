@@ -103,7 +103,10 @@ export class Car {
     const ratio = this.ratio();
     let wheelRpm = Math.abs(rearOmega * ratio) * 60 / (2 * Math.PI);
     const clutchSlip = wheelRpm < 1800 && throttle > 0.02;
+    // over-rev (e.g. wheels spinning freely after a crash): the clutch opens and the engine sits at the limiter
+    const overRev = wheelRpm > SPEC.redline + 500;
     let engRpm = clutchSlip ? Math.max(wheelRpm, SPEC.idle + throttle * 3200) : Math.max(SPEC.idle, wheelRpm);
+    engRpm = Math.min(engRpm, SPEC.redline + 200);
     if (this.shiftTimer > 0) throttle *= 0.15;
     if (engRpm >= SPEC.redline) throttle = (this.time * 40 % 1 < 0.5) ? 0 : throttle * 0.3; // limiter bounce
     // traction control trims throttle when the rears spin up
@@ -119,12 +122,12 @@ export class Car {
     this.throttleOut = throttle;
     let engT = throttle * torqueAt(engRpm) - (1 - throttle) * (28 + engRpm * 0.0065) * Math.min(1, wheelRpm / 1500);
     if (this.gear === 0) engT = 0;
-    const driveT = engT * ratio * SPEC.efficiency; // total at the rear axle
+    const driveT = overRev ? 0 : engT * ratio * SPEC.efficiency; // total at the rear axle
     this.rpm += (engRpm - this.rpm) * Math.min(1, dt * 30);
 
     // ---- auto shift ----
     if (this.auto && this.shiftTimer <= 0 && this.gear >= 1) {
-      if (this.rpm > 8750 && this.gear < 7 && inp.throttle > 0.3) this.shift(+1);
+      if (this.rpm > 8750 && this.gear < 7 && inp.throttle > 0.3 && this.wheels.some(w => w.contact)) this.shift(+1);
       else if (this.gear > 1) {
         const down = SPEC.gears[this.gear - 2] * SPEC.final * Math.abs(rearOmega) * 60 / (2 * Math.PI);
         if (down < (brake > 0.2 ? 7400 : 5600) && this.rpm < (brake > 0.2 ? 6200 : 3800)) this.shift(-1);
@@ -150,7 +153,7 @@ export class Car {
       const dist = (top.y - gy) / upY;          // along car-up to the ground
       const L = dist - s.r;
       wh.Lprev = wh.L;
-      wh.contact = L < SPEC.topMount + 0.12;
+      wh.contact = L < SPEC.topMount + 0.12 && up.y > 0.25; // no grip while on its side or roof
       wh.L = Math.min(SPEC.topMount + 0.12, Math.max(0.07, L));
       wh.surface = W.surface(top.x, top.z, this.hint);
       if (!wh.contact) { wh.Fz = 0; wh.sigma *= 0.9; wh.tanA *= 0.9; comp[k] = 0; continue; }
@@ -180,9 +183,9 @@ export class Car {
       if (!wh.contact) {
         wh.omega += (Td / (s.front ? 1.2 : 1.6)) * dt;
         const dec = Tb / 1.4 * dt; wh.omega = Math.abs(wh.omega) <= dec ? 0 : wh.omega - Math.sign(wh.omega) * dec;
-        wh.angle += wh.omega * dt; continue;
+        wh.omega = Math.max(-280, Math.min(280, wh.omega)); wh.angle += wh.omega * dt; continue;
       }
-      const Fz = Math.max(0, wh.FzSpring) + aero * (s.front ? SPEC.aeroFront : 1 - SPEC.aeroFront) / 2;
+      const Fz = Math.min(18000, Math.max(0, wh.FzSpring) + aero * (s.front ? SPEC.aeroFront : 1 - SPEC.aeroFront) / 2);
       wh.Fz = Fz;
       // contact frame
       const hub = t.a.copy(wh.local).addScaledVector(t.b.set(0, 1, 0), SPEC.topMount - wh.L).applyQuaternion(this.q).add(this.pos);
@@ -213,10 +216,13 @@ export class Car {
       if (this.abs && brake > 0.05 && wh.sigma < -0.11 && ax > 3) { Tb *= 0.25; this.absActive = true; }
       // wheel spin: drive torque minus tyre reaction, then brake
       const Iw = s.front ? 1.2 : 1.6;
+      // the tyre force can bring the wheel to road speed but never push it past (keeps hard landings stable)
+      const vr = vx / r, before = wh.omega - vr;
       wh.omega += (Td - Fx * r) / Iw * dt;
+      if (before * (wh.omega - vr) < 0 && Math.abs(Td) < Math.abs(Fx * r)) wh.omega = vr;
       const dec = Tb / Iw * dt;
       wh.omega = Math.abs(wh.omega) <= dec ? 0 : wh.omega - Math.sign(wh.omega) * dec;
-      wh.angle += wh.omega * dt;
+      wh.omega = Math.max(-280, Math.min(280, wh.omega)); wh.angle += wh.omega * dt;
       // apply suspension (along car up, at the hub) and tyre force (at the contact patch)
       addForceAt(t.e.copy(up).multiplyScalar(Math.max(0, wh.FzSpring)), hub);
       const tire = t.e.copy(wf).multiplyScalar(Fx).addScaledVector(wl, Fy);

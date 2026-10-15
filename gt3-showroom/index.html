@@ -123,7 +123,9 @@ body.driving .ui { display: none; }
 .flags span { padding: 2px 6px; border-radius: 4px; border: 1px solid var(--hud-line); color: var(--hud-dim); }
 .flags span.on { color: var(--hud-fg); } .flags span.act { background: #ffd23f; color: #16181a; border-color: #ffd23f; }
 .hud-bottom-left { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 8px; justify-items: start; }
-#camName { font: 500 11px var(--f-data); letter-spacing: .1em; text-transform: uppercase; color: var(--hud-dim); padding: 6px 10px; }
+.hud-btns { display: flex; gap: 6px; pointer-events: auto; }
+#camName, #resetBtn { font: 500 11px var(--f-data); letter-spacing: .1em; text-transform: uppercase; color: var(--hud-fg); padding: 8px 12px; cursor: pointer; }
+#camName:focus-visible, #resetBtn:focus-visible { outline: 2px solid var(--hud-fg); outline-offset: 2px; }
 #driveHelp { padding: 10px 14px; font: 400 12px var(--f-body); }
 #driveHelp table { border-collapse: collapse; } #driveHelp td { padding: 2px 10px 2px 0; } #driveHelp td:first-child { font-family: var(--f-data); color: var(--hud-dim); white-space: nowrap; }
 .touch { display: none; }
@@ -141,6 +143,19 @@ body.driving .ui { display: none; }
   .touch { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
 }
 
+/* phones in landscape: compact HUD, pedals and steering low and out of the way */
+@media (max-height: 520px) {
+  .laps { padding: 6px 10px; min-width: 0; } #lapNow { font-size: 18px; } .laps dl { font-size: 10px; } .laps .row1 { font-size: 9px; }
+  #miniMap { width: 96px; height: 96px; padding: 2px; } .top-right { gap: 6px; } .exit-btn { padding: 5px 10px; font-size: 11px; }
+  .cluster { min-width: 0; padding: 5px 10px 6px; gap: 3px; left: 50%; right: auto; transform: translateX(-50%); }
+  .led { width: 8px; height: 5px; } #hudGear { font-size: 34px; } .dial .spd b { font-size: 22px; } .dial .rpm b { font-size: 13px; } .dial { gap: 8px; }
+  .flags { display: none; }
+  #driveMsg { font-size: 20px; top: calc(14% + env(safe-area-inset-top, 0px)); }
+  .touch { bottom: calc(52px + env(safe-area-inset-bottom, 0px)); }
+  .touch button { width: 84px; height: 84px; }
+  .hud-bottom-left { bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
+  #camName, #resetBtn { padding: 6px 10px; font-size: 10px; }
+}
 @media (prefers-reduced-motion: reduce) { .loader { transition: none; } #driveMsg { transition: none; } }
 </style>
 
@@ -209,7 +224,7 @@ body.driving .ui { display: none; }
         <tr><td>H &middot; Esc</td><td>Hide this help &middot; Back to showroom</td></tr>
       </table>
     </div>
-    <div class="panel" id="camName">Chase cam</div>
+    <div class="hud-btns"><button type="button" class="panel" id="camName" title="Change camera (C)">Chase cam</button><button type="button" class="panel" id="resetBtn" title="Back onto the track (R)">Reset</button></div>
   </div>
   <div class="panel cluster">
     <div id="hudLeds"></div>
