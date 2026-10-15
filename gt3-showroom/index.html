@@ -124,8 +124,8 @@ body.driving .ui { display: none; }
 .flags span.on { color: var(--hud-fg); } .flags span.act { background: #ffd23f; color: #16181a; border-color: #ffd23f; }
 .hud-bottom-left { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 8px; justify-items: start; }
 .hud-btns { display: flex; gap: 6px; pointer-events: auto; }
-#camName, #resetBtn { font: 500 11px var(--f-data); letter-spacing: .1em; text-transform: uppercase; color: var(--hud-fg); padding: 8px 12px; cursor: pointer; }
-#camName:focus-visible, #resetBtn:focus-visible { outline: 2px solid var(--hud-fg); outline-offset: 2px; }
+#camName, #resetBtn, #handlingBtn { font: 500 11px var(--f-data); letter-spacing: .1em; text-transform: uppercase; color: var(--hud-fg); padding: 8px 12px; cursor: pointer; }
+#camName:focus-visible, #resetBtn:focus-visible, #handlingBtn:focus-visible { outline: 2px solid var(--hud-fg); outline-offset: 2px; }
 #driveHelp { padding: 10px 14px; font: 400 12px var(--f-body); }
 #driveHelp table { border-collapse: collapse; } #driveHelp td { padding: 2px 10px 2px 0; } #driveHelp td:first-child { font-family: var(--f-data); color: var(--hud-dim); white-space: nowrap; }
 .touch { display: none; }
@@ -154,7 +154,7 @@ body.driving .ui { display: none; }
   .touch { bottom: calc(52px + env(safe-area-inset-bottom, 0px)); }
   .touch button { width: 84px; height: 84px; }
   .hud-bottom-left { bottom: calc(8px + env(safe-area-inset-bottom, 0px)); }
-  #camName, #resetBtn { padding: 6px 10px; font-size: 10px; }
+  #camName, #resetBtn, #handlingBtn { padding: 6px 10px; font-size: 10px; }
 }
 @media (prefers-reduced-motion: reduce) { .loader { transition: none; } #driveMsg { transition: none; } }
 </style>
@@ -218,13 +218,14 @@ body.driving .ui { display: none; }
         <tr><td>&uarr; &darr; or W S</td><td>Throttle / brake (hold &darr; when stopped to reverse)</td></tr>
         <tr><td>&larr; &rarr; or A D</td><td>Steer</td></tr>
         <tr><td>Q / E</td><td>Shift down / up (switches to manual)</td></tr>
+        <tr><td>G</td><td>Arcade or sim handling</td></tr>
         <tr><td>M &middot; T &middot; B</td><td>Auto gearbox &middot; Traction control &middot; ABS</td></tr>
         <tr><td>C &middot; R</td><td>Change camera &middot; Reset onto the track</td></tr>
         <tr><td>Space &middot; V &middot; U</td><td>Handbrake &middot; Sound &middot; mph / km/h</td></tr>
         <tr><td>H &middot; Esc</td><td>Hide this help &middot; Back to showroom</td></tr>
       </table>
     </div>
-    <div class="hud-btns"><button type="button" class="panel" id="camName" title="Change camera (C)">Chase cam</button><button type="button" class="panel" id="resetBtn" title="Back onto the track (R)">Reset</button></div>
+    <div class="hud-btns"><button type="button" class="panel" id="camName" title="Change camera (C)">Chase cam</button><button type="button" class="panel" id="resetBtn" title="Back onto the track (R)">Reset</button><button type="button" class="panel" id="handlingBtn" title="Arcade or sim handling (G)">Arcade</button></div>
   </div>
   <div class="panel cluster">
     <div id="hudLeds"></div>
@@ -477,6 +478,7 @@ function exitDrive() {
 document.getElementById('driveBtn').addEventListener('click', () => {
   if (!carRoot || drive.isActive()) return;
   const btn = document.getElementById('driveBtn');
+  drive.unlockAudio(); // must run inside the tap for phones to play sound
   btn.disabled = true; btn.firstChild.nextSibling.nodeValue = 'Building the circuit… ';
   setTimeout(() => {
     try {

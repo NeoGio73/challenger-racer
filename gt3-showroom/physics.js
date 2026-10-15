@@ -52,6 +52,7 @@ export class Car {
     }));
     this.gear = 1; this.rpm = SPEC.idle; this.shiftTimer = 0; this.auto = true;
     this.abs = true; this.tc = true; this.absActive = false; this.tcActive = false;
+    this.arcade = true; // arcade: more grip, stability assist, harder to flip. false = sim handling
     this.hint = -1; this.time = 0; this.gLat = 0; this.gLong = 0; this.offTrack = false;
     this.throttleOut = 0;
     // temporaries
@@ -164,7 +165,8 @@ export class Car {
       wh.FzSpring = Math.max(0, Fs);
     }
     // anti-roll bars
-    const arbF = (comp[0] - comp[1]) * SPEC.arbFront, arbR = (comp[2] - comp[3]) * SPEC.arbRear;
+    const arbK = this.arcade ? 1.7 : 1;
+    const arbF = (comp[0] - comp[1]) * SPEC.arbFront * arbK, arbR = (comp[2] - comp[3]) * SPEC.arbRear * arbK;
     if (this.wheels[0].contact && this.wheels[1].contact) { this.wheels[0].FzSpring += arbF; this.wheels[1].FzSpring -= arbF; }
     if (this.wheels[2].contact && this.wheels[3].contact) { this.wheels[2].FzSpring += arbR; this.wheels[3].FzSpring -= arbR; }
 
@@ -201,11 +203,17 @@ export class Car {
       const ax = Math.abs(vx);
       wh.sigma = (wh.sigma + dt * (wh.omega * r - vx) / SPEC.relaxLong) / (1 + dt * ax / SPEC.relaxLong);
       wh.tanA = (wh.tanA + dt * vy / SPEC.relaxLat) / (1 + dt * ax / SPEC.relaxLat);
-      const mu = (wh.surface === 0 ? SPEC.mu : SPEC.muGrass) * (1 - SPEC.loadSens * (Fz / SPEC.fz0 - 1));
+      const mu = this.arcade
+        ? (wh.surface === 0 ? 1.75 : 1.05) * (1 - 0.03 * (Fz / SPEC.fz0 - 1))
+        : (wh.surface === 0 ? SPEC.mu : SPEC.muGrass) * (1 - SPEC.loadSens * (Fz / SPEC.fz0 - 1));
       const sx = wh.sigma / SPEC.slipPeakLong, sy = wh.tanA / SPEC.slipPeakLat;
       const sMag = Math.hypot(sx, sy);
       let Fx = 0, Fy = 0;
-      if (sMag > 1e-6) { const Fm = mu * Fz * mf(sMag); Fx = Fm * sx / sMag; Fy = -Fm * sy / sMag; }
+      if (sMag > 1e-6) {
+        // arcade tyres keep ~95% of their grip once sliding instead of dropping to ~80%
+        const shape = this.arcade && sMag > 1 ? 1 - 0.05 * Math.min(1, (sMag - 1) / 2) : mf(sMag);
+        const Fm = mu * Fz * shape; Fx = Fm * sx / sMag; Fy = -Fm * sy / sMag;
+      }
       // low-speed damping so a parked car settles instead of creeping
       const lowK = Math.max(0, 1 - speed / 2.5);
       if (lowK > 0) { Fy += -vy * Fz * 0.25 * lowK; }
@@ -227,6 +235,26 @@ export class Car {
       addForceAt(t.e.copy(up).multiplyScalar(Math.max(0, wh.FzSpring)), hub);
       const tire = t.e.copy(wf).multiplyScalar(Fx).addScaledVector(wl, Fy);
       F.add(tire); T.add(t.b.subVectors(cp, this.pos).cross(tire));
+    }
+
+    // ---- arcade assists: yaw stability, slide damping, self-righting ----
+    if (this.arcade) {
+      const grounded = this.wheels.filter(w => w.contact).length;
+      if (grounded >= 2 && speed > 2) {
+        const yawRate = this.w.dot(up);
+        const vF = fwdSpeed;
+        let desired = vF * Math.tan(steer) / 2.46;
+        const maxR = 1.9 * G / Math.max(3, Math.abs(vF));
+        desired = Math.max(-maxR, Math.min(maxR, desired));
+        T.addScaledVector(up, -(yawRate - desired) * 9000);
+        const vLat = this.vel.dot(left);
+        F.addScaledVector(left, -vLat * 1100);
+      }
+      // keep the car upright: spring the body's up axis toward world up, damp roll and pitch
+      const tilt = t.g.crossVectors(up, t.e.set(0, 1, 0));
+      T.addScaledVector(tilt, grounded >= 3 ? 9000 : 22000);
+      const wRP = t.e.copy(this.w).addScaledVector(up, -this.w.dot(up));
+      T.addScaledVector(wRP, -2600);
     }
 
     // ---- aero: drag at CG, downforce at the axles ----
@@ -260,7 +288,7 @@ export class Car {
         const vn = vp.x * nx + vp.z * nz;
         const fn = Math.max(0, pen * 420000 - vn * 14000);
         const tvx = vp.x - vn * nx, tvz = vp.z - vn * nz; const tl = Math.hypot(tvx, tvz);
-        const ff = tl > 0.01 ? Math.min(fn * 0.35, tl * 4000) / tl : 0;
+        const ff = tl > 0.01 ? Math.min(fn * (this.arcade ? 0.08 : 0.35), tl * 4000) / tl : 0;
         addForceAt(t.c.set(nx * fn - tvx * ff, 0, nz * fn - tvz * ff), pw);
         this.hitWall = Math.max(this.hitWall || 0, Math.min(1, fn / 60000));
       }

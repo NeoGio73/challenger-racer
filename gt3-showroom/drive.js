@@ -56,12 +56,30 @@ class EngineAudio {
   resume() { try { this.ctx.resume(); } catch (e) { /* ignore */ } }
 }
 
+// One audio engine for the whole page. It must be created and resumed inside the tap itself:
+// iOS Safari keeps audio silent otherwise, and the ringer switch mutes Web Audio unless the
+// page's audio session is set to "playback".
+let sharedAudio = null;
+export function unlockAudio() {
+  try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* older browsers */ }
+  try {
+    if (!sharedAudio) sharedAudio = new EngineAudio();
+    sharedAudio.resume();
+    // a short silent buffer played right now completes the unlock on older iOS
+    const c = sharedAudio.ctx, b = c.createBuffer(1, 1, 22050), src = c.createBufferSource();
+    src.buffer = b; src.connect(c.destination); src.start(0);
+  } catch (e) { sharedAudio = null; }
+  return sharedAudio;
+}
+addEventListener('pointerdown', () => { if (S && S.audio && S.audio.ctx.state !== 'running') S.audio.resume(); }, { passive: true });
+document.addEventListener('visibilitychange', () => { if (!S || !S.audio) return; if (document.hidden) S.audio.suspend(); else S.audio.resume(); });
+
 // ---------------- input ----------------
 const keys = new Set();
 const onKey = (e) => {
   if (!S) return;
   const k = e.key.toLowerCase();
-  const handled = ['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', ' ', 'e', 'q', 'c', 'r', 'm', 't', 'b', 'v', 'u', 'h', 'escape'];
+  const handled = ['arrowup', 'arrowdown', 'arrowleft', 'arrowright', 'w', 'a', 's', 'd', ' ', 'e', 'q', 'c', 'r', 'm', 't', 'b', 'v', 'u', 'h', 'g', 'escape'];
   if (!handled.includes(k)) return;
   e.preventDefault();
   if (e.type === 'keydown') {
@@ -72,6 +90,7 @@ const onKey = (e) => {
       if (k === 'm') { S.car.auto = !S.car.auto; flash(S.car.auto ? 'Automatic gearbox' : 'Manual gearbox: Q / E to shift'); }
       if (k === 't') { S.car.tc = !S.car.tc; flash('Traction control ' + (S.car.tc ? 'on' : 'off')); }
       if (k === 'b') { S.car.abs = !S.car.abs; flash('ABS ' + (S.car.abs ? 'on' : 'off')); }
+      if (k === 'g') toggleHandling();
       if (k === 'v') { S.audio && S.audio.setMuted(!S.audio.muted); flash(S.audio && S.audio.muted ? 'Sound off' : 'Sound on'); }
       if (k === 'u') { S.metric = !S.metric; }
       if (k === 'h') { $('driveHelp').hidden = !$('driveHelp').hidden; }
@@ -88,6 +107,7 @@ const touch = { l: false, r: false, gas: false, brake: false };
 function bindTouch() {
   $('camName').addEventListener('click', () => cycleCamera());
   $('resetBtn').addEventListener('click', () => { if (S) resetToTrack(); });
+  $('handlingBtn').addEventListener('click', () => toggleHandling());
   document.querySelectorAll('[data-touch]').forEach(b => {
     const k = b.dataset.touch;
     const on = (e) => { e.preventDefault(); touch[k] = true; b.classList.add('on'); };
@@ -121,6 +141,12 @@ const CAMS = ['chase', 'cockpit', 'bumper', 'tv'];
 const CAM_NAMES = { chase: 'Chase', cockpit: 'Cockpit', bumper: 'Bumper', tv: 'TV' };
 function cycleCamera() { if (!S) return; S.cam = CAMS[(CAMS.indexOf(S.cam) + 1) % CAMS.length]; $('camName').textContent = CAM_NAMES[S.cam] + ' cam'; S.camSnap = true; }
 
+function toggleHandling() {
+  if (!S) return;
+  S.car.arcade = !S.car.arcade;
+  try { localStorage.setItem('gt3-handling', S.car.arcade ? 'arcade' : 'sim'); } catch (e) { /* storage blocked */ }
+  flash(S.car.arcade ? 'Arcade handling: extra grip and stability' : 'Sim handling: real GT3 grip, it will slide');
+}
 function flash(msg, ms = 1800) { const el = $('driveMsg'); el.textContent = msg; el.classList.add('show'); clearTimeout(S.msgT); S.msgT = setTimeout(() => el.classList.remove('show'), ms); }
 
 function resetToTrack() {
@@ -177,7 +203,8 @@ export function enter(ctx) {
 
   const car = new Car(TR.world);
   car.reset(TR.gridPose(28));
-  let audio = null; try { audio = new EngineAudio(); audio.resume(); } catch (e) { audio = null; }
+  try { car.arcade = localStorage.getItem('gt3-handling') !== 'sim'; } catch (e) { car.arcade = true; }
+  const audio = unlockAudio(); if (audio) audio.setMuted(false);
   S = {
     ...ctx, car, base, steerBaseQ, steerAxis, tail, audio, acc: 0, cam: 'chase', camSnap: true, metric: false,
     inp: { throttle: 0, brake: 0, steer: 0 }, lap: 0, lapStart: null, lapValid: true, last: null, best: null, halfway: false,
@@ -220,13 +247,13 @@ function gatherInput(dt) {
   const kG = keys.has('arrowup') || keys.has('w') || touch.gas, kB = keys.has('arrowdown') || keys.has('s') || touch.brake;
   const inp = S.inp;
   if (pad) {
-    const cap = Math.min(1, 0.22 + 7 / (v + 7));
+    const cap = car.arcade ? Math.min(1, 0.35 + 10 / (v + 10)) : Math.min(1, 0.22 + 7 / (v + 7));
     inp.steer = pad.steer * cap; inp.throttle = pad.throttle; inp.brake = pad.brake;
   } else {
     // keyboard: ramped inputs, speed-sensitive steering lock so a tap doesn't spin the car
-    const cap = Math.min(1, 0.075 + 3.6 / (v + 3.6));
+    const cap = car.arcade ? Math.min(1, 0.16 + 7 / (v + 7)) : Math.min(1, 0.075 + 3.6 / (v + 3.6));
     const target = ((kL ? 1 : 0) - (kR ? 1 : 0)) * cap;
-    const rate = (Math.sign(target) !== Math.sign(inp.steer) && inp.steer !== 0 ? 6 : 2.6) * Math.max(cap, 0.25);
+    const rate = (Math.sign(target) !== Math.sign(inp.steer) && inp.steer !== 0 ? 6 : (car.arcade ? 4.2 : 2.6)) * Math.max(cap, 0.25);
     inp.steer += Math.max(-rate * dt, Math.min(rate * dt, target - inp.steer));
     inp.throttle += Math.max(-8 * dt, Math.min(5 * dt, (kG ? 1 : 0) - inp.throttle));
     inp.brake += Math.max(-10 * dt, Math.min(7 * dt, (kB ? 1 : 0) - inp.brake));
@@ -335,6 +362,7 @@ function updateHud(dt) {
   $('hudTc').classList.toggle('on', c.tc); $('hudTc').classList.toggle('act', c.tcActive);
   $('hudAbs').classList.toggle('on', c.abs); $('hudAbs').classList.toggle('act', c.absActive);
   $('hudMode').textContent = c.auto ? 'AUTO' : 'MAN';
+  $('handlingBtn').textContent = c.arcade ? 'Arcade' : 'Sim';
   const cur = S.lapStart == null ? null : c.time - S.lapStart;
   $('lapNow').textContent = S.lapStart == null ? 'Out lap' : fmt(cur);
   $('lapNow').classList.toggle('invalid', !S.lapValid && S.lapStart != null);
