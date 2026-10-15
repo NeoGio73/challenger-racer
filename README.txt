@@ -24,3 +24,9 @@ challenger.js contains the exported car geometry.
 This is an arcade time trial, not a simulation or multiplayer game. No account,
 analytics, remote data service, or external CDN is required by the game itself.
 Hosting services may impose their own access requirements.
+
+
+ALSO IN THIS REPO
+
+gt3-showroom/ is a separate three.js project: a Porsche 911 GT3 showroom with a
+sim-style drive mode on a fictional mountain circuit. See gt3-showroom/README.md.

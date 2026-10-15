@@ -1,0 +1,527 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<style>body{margin:0}[hidden]{display:none!important}</style>
+<title>GT3 Showroom</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Saira+Semi+Condensed:wght@400;600;700&family=Instrument+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: one-screen white cyclorama studio; spec header top-left, paint panel right, camera chips bottom. Single deliberate light "studio" look. */
+:root {
+  --studio: #f3f4f2;       /* seamless backdrop */
+  --ink: #16181a;          /* primary text */
+  --ink-soft: #5c615f;     /* secondary text */
+  --hair: rgba(22,24,26,.12);
+  --glass: rgba(255,255,255,.72);
+  --accent: #8cdb14;       /* follows the selected paint */
+  --accent-ink: #16181a;
+  --f-display: "Saira Semi Condensed", "Arial Narrow", system-ui, sans-serif;
+  --f-body: "Instrument Sans", system-ui, -apple-system, "Segoe UI", sans-serif;
+  --f-data: "JetBrains Mono", ui-monospace, "SFMono-Regular", Consolas, monospace;
+  color-scheme: light;
+}
+html, body { height: 100%; }
+body { background: var(--studio); color: var(--ink); font-family: var(--f-body); overflow: hidden; }
+#stage { position: fixed; inset: 0; }
+#stage canvas { display: block; width: 100%; height: 100%; touch-action: none; outline: none; }
+
+.ui { position: fixed; inset: 0; pointer-events: none;
+  padding-left: max(16px, env(safe-area-inset-left, 0px));
+  padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: calc(16px + env(safe-area-inset-top, 0px)) calc(16px + env(safe-area-inset-bottom, 0px));
+  display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto 1fr auto; gap: 12px; }
+.ui > * { pointer-events: auto; }
+
+.spec { grid-column: 1; grid-row: 1; align-self: start; max-width: 30rem; }
+.spec .eyebrow { font-family: var(--f-data); font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); }
+.spec h1 { font-family: var(--f-display); font-weight: 700; font-size: clamp(34px, 6vw, 64px); line-height: .9; letter-spacing: -.01em; margin: 6px 0 10px; text-wrap: balance; }
+.spec h1 span { font-weight: 400; color: var(--ink-soft); }
+.figures { display: flex; flex-wrap: wrap; gap: 4px 18px; font-family: var(--f-data); font-size: 12px; font-variant-numeric: tabular-nums; color: var(--ink); }
+.figures b { font-weight: 500; }
+.figures i { font-style: normal; color: var(--ink-soft); margin-left: 4px; }
+
+.paint { grid-column: 2; grid-row: 1 / span 2; align-self: start; justify-self: end;
+  background: var(--glass); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  border: 1px solid var(--hair); border-radius: 14px; padding: 14px; width: 216px; display: grid; gap: 12px; }
+.paint h2 { font-family: var(--f-data); font-size: 11px; font-weight: 500; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); margin: 0; }
+.swatches { display: grid; grid-template-columns: repeat(6, 1fr); gap: 6px; }
+.swatch { aspect-ratio: 1; max-width: 100%; border-radius: 50%; border: 1px solid var(--hair); cursor: pointer; padding: 0; position: relative; background: var(--c); box-shadow: inset 0 -6px 10px rgba(0,0,0,.18), inset 0 4px 6px rgba(255,255,255,.35); }
+.swatch[aria-pressed="true"]::after { content: ""; position: absolute; inset: -4px; border-radius: 50%; border: 2px solid var(--ink); }
+.swatch:focus-visible { outline: 2px solid var(--ink); outline-offset: 4px; }
+.paint-name { font-family: var(--f-display); font-weight: 600; font-size: 20px; line-height: 1; }
+.paint-name small { display: block; font-family: var(--f-data); font-weight: 400; font-size: 11px; color: var(--ink-soft); margin-top: 4px; letter-spacing: .04em; }
+.seg { display: grid; grid-template-columns: repeat(3, 1fr); border: 1px solid var(--hair); border-radius: 8px; overflow: hidden; }
+.seg button { font: 500 12px var(--f-body); padding: 7px 0; border: 0; background: transparent; color: var(--ink); cursor: pointer; }
+.seg button + button { border-left: 1px solid var(--hair); }
+.seg button[aria-pressed="true"] { background: var(--ink); color: var(--studio); }
+.seg button:focus-visible { outline: 2px solid var(--ink); outline-offset: -2px; }
+
+.views { grid-column: 1 / -1; grid-row: 3; align-self: end; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; justify-content: space-between; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.chip { font: 500 13px var(--f-body); padding: 9px 14px; border-radius: 999px; border: 1px solid var(--hair); background: var(--glass); backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px); color: var(--ink); cursor: pointer; }
+.chip[aria-pressed="true"] { background: var(--ink); color: var(--studio); border-color: var(--ink); }
+.chip:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; }
+.hint { font-family: var(--f-data); font-size: 11px; color: var(--ink-soft); letter-spacing: .04em; }
+.hint kbd { font-family: inherit; border: 1px solid var(--hair); border-radius: 4px; padding: 1px 5px; background: var(--glass); }
+
+.ui .spec, .ui .hint { transition: opacity .4s; }
+.ui.inside .spec, .ui.inside .hint { opacity: 0; pointer-events: none; }
+.loader { position: fixed; inset: 0; display: grid; place-items: center; pointer-events: none; transition: opacity .6s; }
+.loader.done { opacity: 0; }
+.loader div { font-family: var(--f-data); font-size: 12px; letter-spacing: .14em; text-transform: uppercase; color: var(--ink-soft); text-align: center; }
+.loader .bar { width: 180px; height: 2px; background: var(--hair); margin: 10px auto 0; overflow: hidden; }
+.loader .bar span { display: block; height: 100%; width: 0; background: var(--ink); transition: width .2s; }
+.err { color: #9b1c1c; text-transform: none; letter-spacing: 0; font-family: var(--f-body); font-size: 14px; max-width: 26rem; }
+
+@media (max-width: 640px) {
+  .ui { grid-template-columns: 1fr; grid-template-rows: auto 1fr auto auto; }
+  .paint { grid-column: 1; grid-row: 3; justify-self: stretch; width: auto; grid-template-columns: 1fr 1fr; align-items: center; padding: 10px 12px; gap: 8px 12px; }
+  .paint h2 { display: none; }
+  .paint .swatches { grid-column: 1 / -1; }
+  .views { grid-row: 4; }
+  .hint { display: none; }
+}
+
+/* ---------- drive mode ---------- */
+.drive-btn { pointer-events: auto; margin-top: 14px; display: inline-flex; align-items: center; gap: 10px; font: 600 15px var(--f-body); padding: 11px 18px 11px 14px; border-radius: 999px; border: 0; background: var(--ink); color: var(--studio); cursor: pointer; }
+.drive-btn .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 3px rgba(255,255,255,.18); }
+.drive-btn small { font: 400 11px var(--f-data); opacity: .7; letter-spacing: .04em; }
+.drive-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+body.driving .ui { display: none; }
+#hud { --hud-bg: rgba(14,16,18,.62); --hud-fg: #f4f5f3; --hud-dim: rgba(244,245,243,.62); --hud-line: rgba(244,245,243,.16);
+  position: fixed; inset: 0; pointer-events: none; color: var(--hud-fg); font-family: var(--f-body);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px));
+  padding-block: calc(14px + env(safe-area-inset-top, 0px)) calc(14px + env(safe-area-inset-bottom, 0px)); }
+#hud .panel { background: var(--hud-bg); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px); border: 1px solid var(--hud-line); border-radius: 12px; }
+.hud-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+.laps { padding: 10px 14px; min-width: 200px; font-variant-numeric: tabular-nums; }
+.laps .row1 { display: flex; justify-content: space-between; align-items: baseline; font: 500 11px var(--f-data); letter-spacing: .12em; text-transform: uppercase; color: var(--hud-dim); }
+#lapNow { font: 500 30px var(--f-data); line-height: 1.15; display: block; }
+#lapNow.invalid { color: #ff6b6b; }
+.laps dl { display: grid; grid-template-columns: auto 1fr; gap: 2px 12px; margin: 4px 0 0; font: 400 12px var(--f-data); }
+.laps dt { color: var(--hud-dim); } .laps dd { margin: 0; text-align: right; }
+.top-right { display: grid; gap: 8px; justify-items: end; }
+#miniMap { width: 170px; height: 170px; display: block; padding: 4px; }
+.exit-btn { pointer-events: auto; font: 500 12px var(--f-body); color: var(--hud-fg); background: var(--hud-bg); border: 1px solid var(--hud-line); border-radius: 999px; padding: 7px 12px; cursor: pointer; }
+.exit-btn:focus-visible { outline: 2px solid var(--hud-fg); outline-offset: 2px; }
+#driveMsg { position: absolute; left: 50%; top: calc(18% + env(safe-area-inset-top, 0px)); transform: translate(-50%, -8px); font: 700 clamp(22px, 4vw, 40px) var(--f-display); letter-spacing: .01em; text-shadow: 0 2px 18px rgba(0,0,0,.55); opacity: 0; transition: opacity .25s, transform .25s; text-align: center; white-space: nowrap; }
+#driveMsg.show { opacity: 1; transform: translate(-50%, 0); }
+.cluster { position: absolute; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%); padding: 10px 16px 12px; display: grid; gap: 6px; min-width: 300px; }
+#hudLeds { display: flex; gap: 4px; justify-content: center; }
+.led { width: 12px; height: 7px; border-radius: 2px; background: rgba(255,255,255,.12); }
+.led.g { background: #3fe06a; box-shadow: 0 0 8px #3fe06a; } .led.y { background: #ffd23f; box-shadow: 0 0 8px #ffd23f; }
+.led.r { background: #ff3b3b; box-shadow: 0 0 8px #ff3b3b; } .led.b { background: #4aa3ff; box-shadow: 0 0 10px #4aa3ff; }
+.dial { display: grid; grid-template-columns: 1fr auto 1fr; align-items: end; gap: 14px; font-variant-numeric: tabular-nums; }
+.dial .spd { text-align: right; } .dial .spd b { font: 600 38px var(--f-display); line-height: .9; display: block; }
+.dial small { font: 400 11px var(--f-data); color: var(--hud-dim); letter-spacing: .06em; }
+#hudGear { font: 700 56px var(--f-display); line-height: .85; min-width: 1ch; text-align: center; color: var(--accent); }
+.dial .rpm b { font: 500 18px var(--f-data); display: block; }
+.rpmbar { height: 3px; background: rgba(255,255,255,.12); border-radius: 2px; overflow: hidden; } #hudRpmBar { height: 100%; width: 0; background: var(--hud-fg); }
+.flags { display: flex; gap: 6px; justify-content: center; font: 500 10px var(--f-data); letter-spacing: .1em; }
+.flags span { padding: 2px 6px; border-radius: 4px; border: 1px solid var(--hud-line); color: var(--hud-dim); }
+.flags span.on { color: var(--hud-fg); } .flags span.act { background: #ffd23f; color: #16181a; border-color: #ffd23f; }
+.hud-bottom-left { position: absolute; left: max(16px, env(safe-area-inset-left, 0px)); bottom: calc(14px + env(safe-area-inset-bottom, 0px)); display: grid; gap: 8px; justify-items: start; }
+#camName { font: 500 11px var(--f-data); letter-spacing: .1em; text-transform: uppercase; color: var(--hud-dim); padding: 6px 10px; }
+#driveHelp { padding: 10px 14px; font: 400 12px var(--f-body); }
+#driveHelp table { border-collapse: collapse; } #driveHelp td { padding: 2px 10px 2px 0; } #driveHelp td:first-child { font-family: var(--f-data); color: var(--hud-dim); white-space: nowrap; }
+.touch { display: none; }
+@media (pointer: coarse) {
+  .touch { display: flex; position: absolute; bottom: calc(110px + env(safe-area-inset-bottom, 0px)); gap: 10px; pointer-events: auto; }
+  .touch.l { left: max(16px, env(safe-area-inset-left, 0px)); } .touch.r { right: max(16px, env(safe-area-inset-right, 0px)); }
+  .touch button { width: 74px; height: 74px; border-radius: 18px; border: 1px solid var(--hud-line); background: var(--hud-bg); color: var(--hud-fg); font: 600 15px var(--f-body); touch-action: none; user-select: none; -webkit-user-select: none; }
+  .touch button.on { background: rgba(244,245,243,.35); }
+  #driveHelp, .hud-bottom-left .helpkey { display: none !important; }
+}
+@media (max-width: 640px) {
+  .cluster { min-width: 0; left: auto; right: max(16px, env(safe-area-inset-right, 0px)); transform: none; padding: 8px 12px; }
+  #hudGear { font-size: 44px; } .dial .spd b { font-size: 30px; }
+  #miniMap { width: 120px; height: 120px; } .laps { min-width: 0; } #lapNow { font-size: 22px; }
+  .touch { bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+}
+
+@media (prefers-reduced-motion: reduce) { .loader { transition: none; } #driveMsg { transition: none; } }
+</style>
+
+<div id="stage"></div>
+
+<div class="loader" id="loader"><div><span id="loadText">Rolling the car in</span><div class="bar"><span id="loadBar"></span></div></div></div>
+
+<div class="ui">
+  <header class="spec">
+    <div class="eyebrow">Type 992 &middot; Weissach studio</div>
+    <h1>911 GT3 <span>Satin</span></h1>
+    <div class="figures">
+      <span><b>4.0</b><i>L flat-six</i></span>
+      <span><b>502</b><i>hp</i></span>
+      <span><b>9,000</b><i>rpm redline</i></span>
+      <span><b>0&ndash;60</b><i>3.2 s</i></span>
+    </div>
+    <button type="button" class="drive-btn" id="driveBtn" disabled><span class="dot" aria-hidden="true"></span>Drive the Hochwald Ring <small>3.54 km &middot; 13 turns</small></button>
+  </header>
+
+  <aside class="paint" aria-label="Paint">
+    <h2>Paint to sample</h2>
+    <div class="paint-name" id="paintName">Lizard Green<small id="paintNote">Satin finish</small></div>
+    <div class="seg" role="group" aria-label="Finish">
+      <button type="button" id="finSatin" data-finish="satin" aria-pressed="true">Satin</button>
+      <button type="button" id="finGloss" data-finish="gloss" aria-pressed="false">Gloss</button>
+      <button type="button" id="finMatte" data-finish="matte" aria-pressed="false">Matte</button>
+    </div>
+    <div class="swatches" id="swatches"></div>
+  </aside>
+
+  <nav class="views" aria-label="Camera">
+    <div class="chips" id="chips">
+      <button type="button" class="chip" data-view="orbit" aria-pressed="true">Turntable</button>
+      <button type="button" class="chip" data-view="front" aria-pressed="false">Front &frac34;</button>
+      <button type="button" class="chip" data-view="rear" aria-pressed="false">Rear &frac34;</button>
+      <button type="button" class="chip" data-view="side" aria-pressed="false">Profile</button>
+      <button type="button" class="chip" data-view="cockpit" aria-pressed="false">Driver's seat</button>
+    </div>
+    <div class="hint">Drag to look around &middot; <kbd>&larr;</kbd><kbd>&rarr;</kbd> steer &middot; <kbd>C</kbd> cockpit</div>
+  </nav>
+</div>
+
+<div id="hud" hidden>
+  <div class="hud-top">
+    <div class="panel laps">
+      <div class="row1"><span>Hochwald Ring</span><span id="lapNum"></span></div>
+      <span id="lapNow">Out lap</span>
+      <dl><dt>Last</dt><dd id="lapLast">&ndash;:&ndash;&ndash;.&ndash;&ndash;&ndash;</dd><dt>Best</dt><dd id="lapBest">&ndash;:&ndash;&ndash;.&ndash;&ndash;&ndash;</dd></dl>
+    </div>
+    <div class="top-right">
+      <button type="button" class="exit-btn" id="exitDrive">Back to showroom</button>
+      <canvas id="miniMap" class="panel" width="340" height="340" aria-label="Circuit map"></canvas>
+    </div>
+  </div>
+  <div id="driveMsg" role="status" aria-live="polite"></div>
+  <div class="hud-bottom-left">
+    <div id="driveHelp" class="panel">
+      <table>
+        <tr><td>&uarr; &darr; or W S</td><td>Throttle / brake (hold &darr; when stopped to reverse)</td></tr>
+        <tr><td>&larr; &rarr; or A D</td><td>Steer</td></tr>
+        <tr><td>Q / E</td><td>Shift down / up (switches to manual)</td></tr>
+        <tr><td>M &middot; T &middot; B</td><td>Auto gearbox &middot; Traction control &middot; ABS</td></tr>
+        <tr><td>C &middot; R</td><td>Change camera &middot; Reset onto the track</td></tr>
+        <tr><td>Space &middot; V &middot; U</td><td>Handbrake &middot; Sound &middot; mph / km/h</td></tr>
+        <tr><td>H &middot; Esc</td><td>Hide this help &middot; Back to showroom</td></tr>
+      </table>
+    </div>
+    <div class="panel" id="camName">Chase cam</div>
+  </div>
+  <div class="panel cluster">
+    <div id="hudLeds"></div>
+    <div class="dial">
+      <div class="spd"><b id="hudSpeed">0</b><small id="hudUnit">mph</small></div>
+      <div id="hudGear">1</div>
+      <div class="rpm"><b id="hudRpm">950</b><small>rpm &middot; <span id="hudG">0.00 g</span></small></div>
+    </div>
+    <div class="rpmbar"><div id="hudRpmBar"></div></div>
+    <div class="flags"><span id="hudMode">AUTO</span><span id="hudTc" class="on">TC</span><span id="hudAbs" class="on">ABS</span></div>
+  </div>
+  <div class="touch l"><button type="button" data-touch="l" aria-label="Steer left">&larr;</button><button type="button" data-touch="r" aria-label="Steer right">&rarr;</button></div>
+  <div class="touch r"><button type="button" data-touch="brake">Brake</button><button type="button" data-touch="gas">Gas</button></div>
+</div>
+
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+import { DRACOLoader } from 'three/addons/loaders/DRACOLoader.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import * as drive from './drive.js';
+
+const reduceMotion = matchMedia('(prefers-reduced-motion: reduce)').matches;
+const stage = document.getElementById('stage');
+const STUDIO = 0xf3f4f2;
+
+// ---------- renderer / scene ----------
+const renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: 'high-performance' });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 0.82;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+stage.appendChild(renderer.domElement);
+
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(STUDIO);
+scene.fog = new THREE.Fog(STUDIO, 14, 34);
+const pmrem = new THREE.PMREMGenerator(renderer);
+const studioEnv = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+scene.environment = studioEnv;
+scene.environmentIntensity = 0.75;
+
+const camera = new THREE.PerspectiveCamera(32, innerWidth / innerHeight, 0.02, 200);
+camera.position.set(6.2, 2.2, 6.8);
+if (camera.aspect < 1) camera.position.multiplyScalar(Math.min(2.2, 1.25 / camera.aspect));
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true; controls.dampingFactor = 0.06;
+controls.target.set(0, 0.55, 0);
+controls.minDistance = 3.2; controls.maxDistance = 14;
+controls.maxPolarAngle = Math.PI * 0.495;
+controls.enablePan = false;
+controls.autoRotate = !reduceMotion; controls.autoRotateSpeed = 0.55;
+
+// ---------- studio: seamless floor + key light ----------
+const floor = new THREE.Mesh(new THREE.CircleGeometry(60, 96),
+  new THREE.MeshStandardMaterial({ color: STUDIO, roughness: 0.82, metalness: 0 }));
+floor.rotation.x = -Math.PI / 2; floor.receiveShadow = true; scene.add(floor);
+
+// soft contact shadow painted on a canvas, sits under the car
+const cs = document.createElement('canvas'); cs.width = cs.height = 256;
+const g = cs.getContext('2d');
+const grad = g.createRadialGradient(128, 128, 10, 128, 128, 128);
+grad.addColorStop(0, 'rgba(0,0,0,0.55)'); grad.addColorStop(0.55, 'rgba(0,0,0,0.22)'); grad.addColorStop(1, 'rgba(0,0,0,0)');
+g.fillStyle = grad; g.fillRect(0, 0, 256, 256);
+const contact = new THREE.Mesh(new THREE.PlaneGeometry(2.9, 5.6),
+  new THREE.MeshBasicMaterial({ map: new THREE.CanvasTexture(cs), transparent: true, depthWrite: false }));
+contact.rotation.x = -Math.PI / 2; contact.position.y = 0.002; scene.add(contact);
+
+const key = new THREE.DirectionalLight(0xffffff, 1.6);
+key.position.set(3, 9, 4); key.castShadow = true;
+key.shadow.mapSize.set(2048, 2048);
+Object.assign(key.shadow.camera, { left: -4, right: 4, top: 4, bottom: -4, near: 1, far: 20 });
+key.shadow.radius = 6; key.shadow.bias = -0.0004; key.shadow.normalBias = 0.02;
+scene.add(key);
+scene.add(new THREE.HemisphereLight(0xffffff, 0xd9dbd6, 0.6));
+
+// ---------- paint options ----------
+const PAINTS = [
+  { name: 'Lizard Green', hex: '#8cdb14', note: 'GT3 RS launch color' },
+  { name: 'Python Green', hex: '#33ad1f', note: 'GT3 heritage color' },
+  { name: 'Shark Blue',   hex: '#1f6fd9', note: 'Factory GT3 color' },
+  { name: 'Guards Red',   hex: '#c8102e', note: 'Classic 911 red' },
+  { name: 'GT Silver',    hex: '#a9adb0', note: 'Metallic look, flat here' },
+  { name: 'Jet Black',    hex: '#101113', note: 'Deep black' },
+];
+const FINISH = {
+  satin: { roughness: 0.42, clearcoat: 0.35, clearcoatRoughness: 0.38, label: 'Satin finish' },
+  gloss: { roughness: 0.16, clearcoat: 1.0,  clearcoatRoughness: 0.03, label: 'Gloss finish' },
+  matte: { roughness: 0.72, clearcoat: 0.0,  clearcoatRoughness: 0.6,  label: 'Matte finish' },
+};
+let paintIdx = 0, finish = 'satin';
+const paintMats = [];   // body paint, trim, rim stripe
+const accentMats = [];  // seatbelts follow the paint too
+
+const sw = document.getElementById('swatches');
+PAINTS.forEach((p, i) => {
+  const b = document.createElement('button');
+  b.type = 'button'; b.className = 'swatch'; b.id = 'paint-' + i;
+  b.style.setProperty('--c', p.hex); b.setAttribute('aria-label', p.name);
+  b.setAttribute('aria-pressed', i === 0 ? 'true' : 'false');
+  b.addEventListener('click', () => { paintIdx = i; applyPaint(); });
+  sw.appendChild(b);
+});
+document.querySelectorAll('[data-finish]').forEach(b => b.addEventListener('click', () => { finish = b.dataset.finish; applyPaint(); }));
+
+function applyPaint() {
+  const p = PAINTS[paintIdx], f = FINISH[finish];
+  for (const m of paintMats) {
+    m.color.set(p.hex);
+    m.roughness = f.roughness; m.clearcoat = f.clearcoat; m.clearcoatRoughness = f.clearcoatRoughness;
+    m.metalness = 0; m.needsUpdate = true;
+  }
+  for (const m of accentMats) m.color.set(p.hex);
+  document.getElementById('paintName').firstChild.nodeValue = p.name;
+  document.getElementById('paintNote').textContent = f.label + ' \u00b7 ' + p.note;
+  document.querySelector('.spec h1 span').textContent = f.label.split(' ')[0];
+  document.documentElement.style.setProperty('--accent', p.hex);
+  sw.querySelectorAll('.swatch').forEach((b, i) => b.setAttribute('aria-pressed', String(i === paintIdx)));
+  document.querySelectorAll('[data-finish]').forEach(b => b.setAttribute('aria-pressed', String(b.dataset.finish === finish)));
+}
+
+// ---------- load the car ----------
+const parts = {};
+let carRoot = null;          // wheel_FL, steering_wheel, ...
+let steerAxis = new THREE.Vector3(0, -0.2682, 0.9634).normalize();
+const steerBaseQ = new THREE.Quaternion();
+const draco = new DRACOLoader().setDecoderPath('draco/');
+const loader = new GLTFLoader().setDRACOLoader(draco);
+const bar = document.getElementById('loadBar');
+
+function onCar(gltf) {
+  const car = gltf.scene;
+  car.traverse((o) => {
+    if (o.name) parts[o.name] = o;
+    if (!o.isMesh) return;
+    o.castShadow = true; o.receiveShadow = true;
+    const mats = Array.isArray(o.material) ? o.material : [o.material];
+    for (const m of mats) {
+      const n = m.name || '';
+      if (n === 'paint' || n === 'paint_trim' || n === 'paint_rim_stripe') {
+        if (!m.isMeshPhysicalMaterial) {
+          const pm = new THREE.MeshPhysicalMaterial({ name: n });
+          if (Array.isArray(o.material)) o.material[o.material.indexOf(m)] = pm; else o.material = pm;
+          paintMats.push(pm);
+        } else paintMats.push(m);
+      } else if (n === 'seatbelt_green') accentMats.push(m);
+      else if (n.startsWith('glass')) {
+        m.transparent = true; m.opacity = 0.22; m.depthWrite = false; m.roughness = 0.02; m.metalness = 0;
+        m.color.set(0x0b0d0e); m.envMapIntensity = 1.4;
+      } else if (n === 'carbon fiber') { m.color.setScalar(0.22); }
+      else if (n === 'headlight_emit') { m.emissiveIntensity = 2.2; m.toneMapped = false; }
+      else if (n === 'taillight_emit' || n === 'taillight.002') { m.emissiveIntensity = 1.6; }
+      else if (m.alphaMap || m.transparent) { m.alphaTest = 0.4; m.transparent = false; }
+    }
+    if (o.material && o.material.transparent) o.castShadow = false;
+  });
+  // the steering wheel stores its column axis in the file
+  const sWheel = parts.steering_wheel;
+  if (sWheel) {
+    const ax = sWheel.userData && sWheel.userData.spin_axis_gltf;
+    if (ax) steerAxis.fromArray(ax).normalize();
+    steerBaseQ.copy(sWheel.quaternion);
+  }
+  scene.add(car);
+  carRoot = car;
+  document.getElementById('driveBtn').disabled = false;
+  applyPaint();
+  document.getElementById('loader').classList.add('done');
+}
+function failCar(err) {
+  console.error(err);
+  document.getElementById('loadText').innerHTML = '<span class="err">The car model didn\u2019t load. Reload the page to try again.</span>';
+}
+// the model ships as a base64 script so it can be served alongside the page
+const modelScript = document.createElement('script');
+modelScript.src = 'porsche_gt3_model.js';
+let fake = 8; const tick = setInterval(() => { fake = Math.min(92, fake + (92 - fake) * 0.08); bar.style.width = fake + '%'; }, 120);
+modelScript.onload = () => {
+  try {
+    const bin = atob(window.PORSCHE_GT3_GLB); const buf = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) buf[i] = bin.charCodeAt(i);
+    delete window.PORSCHE_GT3_GLB;
+    loader.parse(buf.buffer, '', (g) => { clearInterval(tick); bar.style.width = '100%'; onCar(g); }, (e) => { clearInterval(tick); failCar(e); });
+  } catch (e) { clearInterval(tick); failCar(e); }
+};
+modelScript.onerror = (e) => { clearInterval(tick); failCar(e); };
+document.head.appendChild(modelScript);
+
+// ---------- camera views ----------
+// glTF space: car nose points +Z, driver sits on +X (left-hand drive)
+const VIEWS = {
+  orbit:   { pos: [6.2, 2.2, 6.8],    target: [0, 0.55, 0],    fov: 32, auto: true },
+  front:   { pos: [3.9, 1.25, 5.4],   target: [0, 0.55, 0.3],  fov: 30 },
+  rear:    { pos: [-4.2, 1.6, -5.2],  target: [0, 0.6, -0.3],  fov: 30 },
+  side:    { pos: [8.6, 0.85, 0.0],   target: [0, 0.6, 0],     fov: 26 },
+  cockpit: { pos: [0.37, 1.0, -0.22], target: [0.37, 0.93, 0.4], fov: 68, inside: true },
+};
+let view = 'orbit', tween = null;
+function setView(name) {
+  const v = VIEWS[name]; if (!v) return;
+  view = name;
+  document.querySelectorAll('.chip').forEach(c => c.setAttribute('aria-pressed', String(c.dataset.view === name)));
+  controls.autoRotate = !!v.auto && !reduceMotion;
+  document.querySelector('.ui').classList.toggle('inside', !!v.inside);
+  const tgt = new THREE.Vector3(...v.target), pos = new THREE.Vector3(...v.pos);
+  if (!v.inside && camera.aspect < 1) pos.sub(tgt).multiplyScalar(Math.min(2.2, 1.25 / camera.aspect)).add(tgt);
+  if (v.inside) {
+    controls.minDistance = 0.01; controls.maxDistance = 1.2; controls.enableZoom = false;
+    controls.rotateSpeed = -0.35; controls.maxPolarAngle = Math.PI * 0.75; controls.minPolarAngle = Math.PI * 0.25;
+  } else {
+    controls.minDistance = 3.2; controls.maxDistance = 14; controls.enableZoom = true;
+    controls.rotateSpeed = 1; controls.maxPolarAngle = Math.PI * 0.495; controls.minPolarAngle = 0;
+  }
+  tween = {
+    t: reduceMotion ? 1 : 0,
+    p0: camera.position.clone(), p1: pos,
+    q0: controls.target.clone(), q1: tgt,
+    f0: camera.fov, f1: v.fov,
+  };
+  // stepping into the cockpit: cut rather than fly through the door
+  if (v.inside || VIEWS[prevView]?.inside) tween.t = 1;
+  prevView = name;
+}
+let prevView = 'orbit';
+document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => setView(c.dataset.view)));
+controls.addEventListener('start', () => { tween = null; if (view === 'orbit') controls.autoRotate = false; });
+
+// ---------- drive mode ----------
+const leds = document.getElementById('hudLeds');
+for (let i = 0; i < 15; i++) { const d = document.createElement('span'); d.className = 'led'; leds.appendChild(d); }
+function exitDrive() {
+  if (!drive.isActive()) return;
+  drive.exit();
+  controls.enabled = true; held.clear();
+  scene.environment = studioEnv; renderer.toneMappingExposure = 0.82;
+  camera.position.set(...VIEWS.orbit.pos); controls.target.set(...VIEWS.orbit.target); camera.fov = VIEWS.orbit.fov; camera.updateProjectionMatrix();
+  setView('orbit');
+  document.getElementById('driveBtn').focus();
+}
+document.getElementById('driveBtn').addEventListener('click', () => {
+  if (!carRoot || drive.isActive()) return;
+  const btn = document.getElementById('driveBtn');
+  btn.disabled = true; btn.firstChild.nextSibling.nodeValue = 'Building the circuit… ';
+  setTimeout(() => {
+    try {
+      controls.enabled = false; controls.autoRotate = false; tween = null;
+      drive.enter({ renderer, camera, carRoot, parts, studioScene: scene, onExit: exitDrive });
+    } catch (err) { console.error(err); controls.enabled = true; }
+    btn.disabled = false; btn.firstChild.nextSibling.nodeValue = 'Drive the Hochwald Ring ';
+  }, 30);
+});
+document.getElementById('exitDrive').addEventListener('click', exitDrive);
+
+// ---------- steering (arrow keys / A-D) ----------
+let steerInput = 0, steer = 0;
+const held = new Set();
+addEventListener('keydown', (e) => {
+  if (drive.isActive()) return;
+  if (e.target.closest && e.target.closest('input,textarea')) return;
+  if (['ArrowLeft', 'ArrowRight', 'a', 'd', 'A', 'D'].includes(e.key)) { held.add(e.key.toLowerCase()); e.preventDefault(); }
+  if (e.key === 'c' || e.key === 'C') setView(view === 'cockpit' ? 'orbit' : 'cockpit');
+});
+addEventListener('keyup', (e) => held.delete(e.key.toLowerCase()));
+addEventListener('blur', () => held.clear());
+
+const MAX_STEER = 0.52;          // ~30° at the front wheels
+const WHEEL_RATIO = 7.5;         // steering wheel turns more than the road wheels
+const qTmp = new THREE.Quaternion();
+const Y = new THREE.Vector3(0, 1, 0);
+
+// ---------- loop ----------
+const clock = new THREE.Clock();
+function frame() {
+  const dt = Math.min(clock.getDelta(), 0.05);
+  if (drive.isActive()) { drive.frame(dt); requestAnimationFrame(frame); return; }
+  if (tween) {
+    tween.t = Math.min(1, tween.t + dt / 1.3);
+    const k = tween.t < 0.5 ? 4 * tween.t ** 3 : 1 - (-2 * tween.t + 2) ** 3 / 2;
+    camera.position.lerpVectors(tween.p0, tween.p1, k);
+    controls.target.lerpVectors(tween.q0, tween.q1, k);
+    camera.fov = tween.f0 + (tween.f1 - tween.f0) * k; camera.updateProjectionMatrix();
+    if (tween.t >= 1) tween = null;
+  }
+  steerInput = (held.has('arrowleft') || held.has('a') ? 1 : 0) - (held.has('arrowright') || held.has('d') ? 1 : 0);
+  steer += (steerInput * MAX_STEER - steer) * Math.min(1, dt * 6);
+  for (const s of ['FL', 'FR']) {
+    const w = parts['wheel_' + s], c = parts['caliper_' + s];
+    if (w) w.rotation.y = steer;
+    if (c) c.rotation.y = steer;
+  }
+  if (parts.steering_wheel) {
+    qTmp.setFromAxisAngle(steerAxis, -steer * WHEEL_RATIO);
+    parts.steering_wheel.quaternion.copy(qTmp).multiply(steerBaseQ);
+  }
+  controls.update();
+  renderer.render(scene, camera);
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
+
+addEventListener('resize', () => {
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  renderer.setSize(innerWidth, innerHeight);
+});
+</script>
